@@ -184,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
 
                         getting the text (Raw value) in the QR_CODE using getRawValues() function in the @barcode
 
-                        displaying the text ont he Dialog box
+                        displaying the text on the Dialog box
 
                         Also, there could be different ways to use this retrieved data
                      */
