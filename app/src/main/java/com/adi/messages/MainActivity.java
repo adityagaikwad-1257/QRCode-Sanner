@@ -1,10 +1,7 @@
 package com.adi.messages;
 
-import static android.provider.MediaStore.ACTION_IMAGE_CAPTURE;
-
 import android.app.AlertDialog;
-import android.content.Intent;
-import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -12,6 +9,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 import com.adi.messages.databinding.ActivityMainBinding;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
@@ -20,6 +18,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.io.File;
 import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
@@ -40,28 +39,41 @@ public class MainActivity extends AppCompatActivity {
     InputImage inputImage;
 
     /*
+        holds the URI to the Image file created in the private space
+     */
+    private Uri capturedImageUri;
+
+    /*
         @ActivityResultLauncher to launch camera
         to capture picture using System Camera app
+
+        the image captured is written on the file created in private space
+        with the help of the uri passed
      */
-    private final ActivityResultLauncher<Intent> cameraLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
-            activityResult -> {
+    private final ActivityResultLauncher<Uri> cameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(),
+            result -> {
+                /*
+                    result is of boolean type
+
+                    tells if the image was captured and successfully written on the file present at the
+                    passed uri
+                 */
                 try {
+                    Log.d(TAG, "result from image capture: " + result);
 
-                    /*
-                        getting Bitmap from the Bundle received as an Extra in @ActivityResult object
-                     */
-                    Bitmap result = (Bitmap) (activityResult.getData() != null ? activityResult.getData().getExtras().get("data") : null);
+                    if (result){
+                        /*
+                            converting captured image to @InputImage
+                         */
+                        inputImage = InputImage.fromFilePath(this, capturedImageUri);
 
-                    /*
-                        getting @InputImage from the bitmap received
-                        passing rotation as 0 (no rotation)
-                     */
-                    if (result != null) inputImage = InputImage.fromBitmap(result, 0);
-
-                    /*
-                        scanning inputImage retrieved
-                     */
-                    scanBarcode();
+                        /*
+                            scanning inputImage retrieved
+                        */
+                        scanBarcode();
+                    } else {
+                        Toast.makeText(this, "please select am image :)", Toast.LENGTH_SHORT).show();
+                    }
 
                 } catch (NullPointerException e) {
                     Log.d(TAG, "null bitmap while capturing image: " + e.getMessage());
@@ -119,12 +131,17 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(binding.mainToolBar);
 
         /*
+            getting imageUri to the image file in the private space of the app
+         */
+        capturedImageUri = createImageFile();
+
+        /*
             on the click of Camera Image Option
 
             launching camera with cameraLauncher to click an Image of the QR code
-            Action specified in the Intent defines cameraLauncher to launch camera
+            specifying the URI on which the CAMERA app should override the image
          */
-        binding.optCamera.setOnClickListener(v -> cameraLauncher.launch(new Intent(ACTION_IMAGE_CAPTURE)));
+        binding.optCamera.setOnClickListener(v -> cameraLauncher.launch(capturedImageUri));
 
         /*
             on the click of Gallery Image Option
@@ -136,6 +153,20 @@ public class MainActivity extends AppCompatActivity {
         binding.optGallery.setOnClickListener(v -> getContentLauncher.launch("image/*"));
     }
 
+    /*
+        creating an Image File in the private space of the app
+        and returning its URI
+     */
+    private Uri createImageFile() {
+        File imageFile = new File(getApplicationContext().getFilesDir(), "qrcode.jpg");
+
+        /*
+            A provider with authority : "com.adi.messages.file_provider" would allow writing on this file
+            A uri is generated accordingly
+         */
+        return FileProvider.getUriForFile(getApplicationContext(), "com.adi.messages.file_provider",
+                imageFile);
+    }
 
     /*
         uses @BarcodeScanner to scan inputImage selected by the user
